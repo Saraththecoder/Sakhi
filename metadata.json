@@ -1,0 +1,7 @@
+{
+  "name": "Sakhi - Women's Health Companion",
+  "description": "A friendly, AI-powered women's health companion for period tracking, daily tips, and symptom relief in Hinglish.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
