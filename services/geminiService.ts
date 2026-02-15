@@ -3,10 +3,12 @@ import { SAKHI_SYSTEM_INSTRUCTION } from "../constants";
 import { UserProfile, Message } from "../types";
 import { addPeriodDate, logSymptom } from "./storageService";
 
-let apiKey: string | undefined;
+// Use the provided API key by default, allow override via environment variable
+const DEFAULT_API_KEY = "AIzaSyDveSfzNqkIkFp-m1zrlXi4O80c6DCxlZU";
+let apiKey = DEFAULT_API_KEY;
 
 // Safe access to process.env.API_KEY
-if (typeof process !== 'undefined' && process.env) {
+if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
   apiKey = process.env.API_KEY;
 }
 
