@@ -132,9 +132,9 @@ const App: React.FC = () => {
             
             <button 
                 onClick={() => setActiveTab('chat')}
-                className={`flex flex-col items-center gap-1 transition-colors w-16 ${activeTab === 'chat' ? 'text-sakhi-500' : 'text-gray-400'}`}
+                className={`flex flex-col items-center gap-1 transition-colors w-16 text-gray-400`}
             >
-                <MessageCircle size={24} strokeWidth={activeTab === 'chat' ? 2.5 : 2} />
+                <MessageCircle size={24} strokeWidth={2} />
                 <span className="text-[10px] font-medium">Chat</span>
             </button>
 

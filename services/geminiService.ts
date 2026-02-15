@@ -3,7 +3,13 @@ import { SAKHI_SYSTEM_INSTRUCTION } from "../constants";
 import { UserProfile, Message } from "../types";
 import { addPeriodDate, logSymptom } from "./storageService";
 
-const apiKey = process.env.API_KEY;
+let apiKey: string | undefined;
+try {
+  apiKey = process.env.API_KEY;
+} catch (e) {
+  console.warn("process.env.API_KEY is not accessible. Chat features may not work.");
+}
+
 let ai: GoogleGenAI | null = null;
 let chatSession: Chat | null = null;
 let currentUserProfile: UserProfile | null = null;
@@ -107,7 +113,7 @@ export const initializeChat = async (history: Message[], userProfile: UserProfil
 };
 
 export const sendMessageToGemini = async (text: string): Promise<string> => {
-  if (!ai) return "Configuration Error: API Key is missing.";
+  if (!ai) return "Configuration Error: API Key is missing or invalid.";
 
   // Auto-recover session if missing
   if (!chatSession) {

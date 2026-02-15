@@ -58,5 +58,21 @@
 </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Global error handler to catch white screens on mobile
+      window.addEventListener('error', function(event) {
+        // Ignore resize observations errors which are benign
+        if (event.message === 'ResizeObserver loop limit exceeded') return;
+        
+        const root = document.getElementById('root');
+        if (root && root.innerHTML.trim() === '') {
+           const errorDiv = document.createElement('div');
+           errorDiv.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:white; color:red; padding:20px; z-index:9999; overflow:auto;';
+           errorDiv.innerHTML = '<h3>Something went wrong</h3><pre>' + event.message + '</pre>';
+           document.body.appendChild(errorDiv);
+        }
+        console.error("Global error:", event.error);
+      });
+    </script>
   </body>
 </html>

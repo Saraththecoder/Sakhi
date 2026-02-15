@@ -1,4 +1,5 @@
-import { UserProfile, Message, SymptomEntry } from "../types";
+import { UserProfile, Message, SymptomEntry, CycleStatus, CyclePhase } from "../types";
+import { PHASES } from "../constants";
 
 const PROFILE_KEY = 'sakhi_user_profile';
 const MESSAGES_KEY = 'sakhi_chat_history';
@@ -33,123 +34,87 @@ export const logSymptom = (symptom: string): SymptomEntry | null => {
   if (!profile) return null;
 
   const todayStr = new Date().toISOString().split('T')[0];
+  const lastPeriod = new Date(profile.lastPeriodDate);
+  const today = new Date();
   
   // Calculate Cycle Day for this symptom
-  let cycleDay = 1;
-  if (profile.lastPeriodDate) {
-      const lastPeriod = new Date(profile.lastPeriodDate);
-      const today = new Date();
-      lastPeriod.setHours(0,0,0,0);
-      today.setHours(0,0,0,0);
-      const diffTime = today.getTime() - lastPeriod.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      cycleDay = (diffDays % profile.cycleLength) + 1;
-      if (cycleDay <= 0) cycleDay = 1;
-  }
+  // Reset time part to ensure day diff is correct
+  lastPeriod.setHours(0,0,0,0);
+  today.setHours(0,0,0,0);
+  
+  const diffTime = today.getTime() - lastPeriod.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  // Cycle day 1 is the start date
+  const cycleDay = diffDays + 1;
 
   const newEntry: SymptomEntry = {
-      date: todayStr,
-      symptom: symptom,
-      cycleDay: cycleDay
+    date: todayStr,
+    symptom: symptom,
+    cycleDay: cycleDay > 0 ? cycleDay : 1
   };
 
-  // Initialize if missing (double safety)
-  if (!profile.symptomHistory) profile.symptomHistory = [];
-  
-  // Add to history
-  profile.symptomHistory.push(newEntry);
-  
-  // Sort descending by date
-  profile.symptomHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
+  profile.symptomHistory = [newEntry, ...(profile.symptomHistory || [])];
   saveProfile(profile);
   return newEntry;
 };
 
-export const addPeriodDate = (dateStr: string): UserProfile | null => {
+export const addPeriodDate = (date: string) => {
   const profile = getProfile();
-  if (!profile) return null;
-  
-  // Initialize history if missing
-  if (!profile.periodHistory) profile.periodHistory = [profile.lastPeriodDate];
+  if (!profile) return;
 
-  // Add new date if it's not already the most recent one to avoid duplicates
-  // We allow manual entry, so we should check if it exists
-  if (!profile.periodHistory.includes(dateStr)) {
-      profile.periodHistory.push(dateStr);
-      // Sort descending (newest first)
-      profile.periodHistory.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-  }
-  
-  // Update lastPeriodDate to the most recent one
-  profile.lastPeriodDate = profile.periodHistory[0];
-
-  // Recalculate cycle length if we have enough history (at least 2 dates)
-  if (profile.periodHistory.length >= 2) {
-      // Simple average of last 3 gaps
-      let totalDays = 0;
-      let gaps = 0;
-      const history = profile.periodHistory.slice(0, 4); // Take last 4 dates to get 3 gaps
-      // History is sorted desc: D1, D2, D3...
-      for (let i = 0; i < history.length - 1; i++) {
-           const d1 = new Date(history[i]);
-           const d2 = new Date(history[i+1]);
-           const diffTime = Math.abs(d1.getTime() - d2.getTime());
-           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-           
-           // Filter outliers (e.g. skipped periods or very short cycles)
-           if (diffDays > 15 && diffDays < 45) { 
-               totalDays += diffDays;
-               gaps++;
-           }
-      }
-      if (gaps > 0) {
-          profile.cycleLength = Math.round(totalDays / gaps);
+  // Add current lastPeriodDate to history if it's different and not already there
+  if (profile.lastPeriodDate && profile.lastPeriodDate !== date) {
+      if (!profile.periodHistory.includes(profile.lastPeriodDate)) {
+          profile.periodHistory.unshift(profile.lastPeriodDate); // Add to front
       }
   }
+
+  profile.lastPeriodDate = date;
   
+  // Ensure the new date is also in history
+  if (!profile.periodHistory.includes(date)) {
+      profile.periodHistory.unshift(date);
+  }
+  
+  // Keep history sorted desc
+  profile.periodHistory.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
   saveProfile(profile);
-  return profile;
 };
 
-export const calculateCycleStatus = (lastPeriodDateStr: string, cycleLength: number) => {
-  const lastPeriod = new Date(lastPeriodDateStr);
+export const calculateCycleStatus = (lastPeriodDate: string, cycleLength: number): CycleStatus => {
+  const start = new Date(lastPeriodDate);
   const today = new Date();
   
-  // Reset time part to ensure day calculations are accurate
+  // Reset hours
+  start.setHours(0,0,0,0);
   today.setHours(0,0,0,0);
-  lastPeriod.setHours(0,0,0,0);
 
-  // Calculate difference in days
-  // We need signed difference to know if we are ahead or behind, but logic below handles it
-  const diffTime = today.getTime() - lastPeriod.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  
-  // Current day in cycle (1-based)
-  // If diffDays is 0 (today is period day), it's Day 1.
-  // If diffDays is 5, it's Day 6.
-  const currentDay = (diffDays % cycleLength) + 1;
+  const diffTime = today.getTime() - start.getTime();
+  const day = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-  // Next period calculation
-  const nextPeriod = new Date(lastPeriod);
-  nextPeriod.setDate(lastPeriod.getDate() + cycleLength);
+  // Determine Phase using constants
+  let phase = CyclePhase.Luteal; // Default fallback
   
-  // If next period is in the past (e.g. user hasn't logged recent period), 
-  // project it forward
-  while (nextPeriod < today) {
-    nextPeriod.setDate(nextPeriod.getDate() + cycleLength);
+  if (day >= PHASES.MENSTRUAL.start && day <= PHASES.MENSTRUAL.end) {
+    phase = CyclePhase.Menstrual;
+  } else if (day >= PHASES.FOLLICULAR.start && day <= PHASES.FOLLICULAR.end) {
+    phase = CyclePhase.Follicular;
+  } else if (day >= PHASES.OVULATION.start && day <= PHASES.OVULATION.end) {
+    phase = CyclePhase.Ovulation;
+  } else {
+    phase = CyclePhase.Luteal;
   }
 
-  const daysUntilNext = Math.ceil((nextPeriod.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-  let phase = 'Follicular';
-  if (currentDay >= 1 && currentDay <= 5) phase = 'Menstrual';
-  else if (currentDay >= 6 && currentDay <= 13) phase = 'Follicular';
-  else if (currentDay >= 14 && currentDay <= 16) phase = 'Ovulation';
-  else if (currentDay >= 17) phase = 'Luteal';
+  // Next Period
+  const nextPeriod = new Date(start);
+  nextPeriod.setDate(start.getDate() + cycleLength);
+  
+  const diffNext = nextPeriod.getTime() - today.getTime();
+  const daysUntilNext = Math.ceil(diffNext / (1000 * 60 * 60 * 24));
 
   return {
-    day: currentDay > 0 ? currentDay : 1,
+    day: day > 0 ? day : 1, 
     phase,
     nextPeriodDate: nextPeriod,
     daysUntilNext
