@@ -4,10 +4,14 @@ import { UserProfile, Message } from "../types";
 import { addPeriodDate, logSymptom } from "./storageService";
 
 let apiKey: string | undefined;
-try {
+
+// Safe access to process.env.API_KEY
+if (typeof process !== 'undefined' && process.env) {
   apiKey = process.env.API_KEY;
-} catch (e) {
-  console.warn("process.env.API_KEY is not accessible. Chat features may not work.");
+}
+
+if (!apiKey) {
+    console.warn("API Key not found. Chat will be disabled.");
 }
 
 let ai: GoogleGenAI | null = null;

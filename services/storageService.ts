@@ -5,28 +5,46 @@ const PROFILE_KEY = 'sakhi_user_profile';
 const MESSAGES_KEY = 'sakhi_chat_history';
 
 export const saveProfile = (profile: UserProfile) => {
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  try {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  } catch (e) {
+    console.warn("Failed to save profile", e);
+  }
 };
 
 export const getProfile = (): UserProfile | null => {
-  const data = localStorage.getItem(PROFILE_KEY);
-  if (!data) return null;
-  
-  const profile = JSON.parse(data);
-  // Backward compatibility: ensure symptomHistory exists
-  if (!profile.symptomHistory) {
-    profile.symptomHistory = [];
+  try {
+    const data = localStorage.getItem(PROFILE_KEY);
+    if (!data) return null;
+    
+    const profile = JSON.parse(data);
+    // Backward compatibility: ensure symptomHistory exists
+    if (!profile.symptomHistory) {
+      profile.symptomHistory = [];
+    }
+    return profile;
+  } catch (e) {
+    console.error("Failed to load profile", e);
+    return null;
   }
-  return profile;
 };
 
 export const saveMessages = (messages: Message[]) => {
-  localStorage.setItem(MESSAGES_KEY, JSON.stringify(messages));
+  try {
+    localStorage.setItem(MESSAGES_KEY, JSON.stringify(messages));
+  } catch (e) {
+    console.warn("Failed to save messages", e);
+  }
 };
 
 export const getMessages = (): Message[] => {
-  const data = localStorage.getItem(MESSAGES_KEY);
-  return data ? JSON.parse(data) : [];
+  try {
+    const data = localStorage.getItem(MESSAGES_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    console.error("Failed to load messages", e);
+    return [];
+  }
 };
 
 export const logSymptom = (symptom: string): SymptomEntry | null => {
@@ -83,7 +101,18 @@ export const addPeriodDate = (date: string) => {
 };
 
 export const calculateCycleStatus = (lastPeriodDate: string, cycleLength: number): CycleStatus => {
+  // Handle potential invalid date strings gracefully
   const start = new Date(lastPeriodDate);
+  if (isNaN(start.getTime())) {
+      // Return a safe fallback if date is corrupted
+      return {
+          day: 1,
+          phase: CyclePhase.Follicular,
+          nextPeriodDate: new Date(),
+          daysUntilNext: 28
+      };
+  }
+
   const today = new Date();
   
   // Reset hours
