@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { UserProfile, DietPreference } from '../types';
-import { Save, User, Calendar, Utensils, Activity, Clock } from 'lucide-react';
+import { UserProfile, DietPreference, Language } from '../types';
+import { Save, User, Calendar, Utensils, Activity, Clock, Languages } from 'lucide-react';
+import { LANGUAGES } from '../constants';
 
 interface ProfileSettingsProps {
   userProfile: UserProfile;
@@ -11,6 +12,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ userProfile, onSave }
   const [date, setDate] = useState(userProfile.lastPeriodDate);
   const [cycleLength, setCycleLength] = useState(userProfile.cycleLength);
   const [diet, setDiet] = useState<DietPreference>(userProfile.dietPreference);
+  const [language, setLanguage] = useState<Language>(userProfile.language || 'english');
   const [isSaved, setIsSaved] = useState(false);
 
   const handleSave = () => {
@@ -19,7 +21,8 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ userProfile, onSave }
         ...userProfile, 
         lastPeriodDate: date, 
         cycleLength: Number(cycleLength),
-        dietPreference: diet 
+        dietPreference: diet,
+        language: language
     };
     
     // Logic to keep history consistent:
@@ -37,9 +40,9 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ userProfile, onSave }
   };
 
   return (
-    <div className="h-full bg-gray-50 flex flex-col overflow-y-auto pb-20">
+    <div className="h-full bg-gray-50 flex flex-col overflow-y-auto pb-20 animate-fade-in">
        {/* Header */}
-       <div className="bg-white p-6 shadow-sm border-b sticky top-0 z-10">
+       <div className="bg-white p-6 shadow-sm border-b sticky top-0 z-10 safe-top">
          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
            <User className="text-sakhi-500" /> My Profile
          </h1>
@@ -48,7 +51,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ userProfile, onSave }
 
        <div className="p-6 space-y-6">
          {/* Cycle Section */}
-         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 animate-slide-up" style={{animationDelay: '0.1s'}}>
            <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
              <Calendar size={18} className="text-sakhi-400" /> Cycle Details
            </h3>
@@ -60,7 +63,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ userProfile, onSave }
                  type="date" 
                  value={date}
                  onChange={(e) => setDate(e.target.value)}
-                 className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sakhi-400 outline-none text-gray-800"
+                 className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sakhi-400 outline-none text-gray-800 transition-all"
                />
                <p className="text-xs text-gray-400 mt-1">Correct this if your start date was different.</p>
              </div>
@@ -73,15 +76,38 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ userProfile, onSave }
                  max="45"
                  value={cycleLength}
                  onChange={(e) => setCycleLength(Number(e.target.value))}
-                 className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sakhi-400 outline-none text-gray-800"
+                 className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sakhi-400 outline-none text-gray-800 transition-all"
                />
                 <p className="text-xs text-gray-400 mt-1">Usually 28 days. Adjust if yours is different.</p>
              </div>
            </div>
          </div>
 
+         {/* Language Section */}
+         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 animate-slide-up" style={{animationDelay: '0.2s'}}>
+           <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+             <Languages size={18} className="text-sakhi-400" /> Language
+           </h3>
+           <div className="grid grid-cols-2 gap-2">
+             {LANGUAGES.map((lang) => (
+                <button
+                    key={lang.code}
+                    onClick={() => setLanguage(lang.code)}
+                    className={`p-2 rounded-lg border text-sm transition-all active:scale-[0.98]
+                        ${language === lang.code 
+                            ? 'border-sakhi-500 bg-sakhi-50 text-sakhi-700 font-medium' 
+                            : 'border-gray-200 bg-gray-50 text-gray-600'}
+                    `}
+                >
+                    {lang.label}
+                </button>
+             ))}
+           </div>
+           <p className="text-xs text-gray-400 mt-2">Chat with Sakhi in your preferred language.</p>
+         </div>
+
          {/* Diet Section */}
-         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 animate-slide-up" style={{animationDelay: '0.3s'}}>
            <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
              <Utensils size={18} className="text-sakhi-400" /> Diet Preference
            </h3>
@@ -89,7 +115,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ userProfile, onSave }
            <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setDiet('vegetarian')}
-                className={`p-3 rounded-xl border transition-all flex flex-col items-center gap-2
+                className={`p-3 rounded-xl border transition-all flex flex-col items-center gap-2 active:scale-[0.98]
                   ${diet === 'vegetarian' 
                     ? 'border-sakhi-500 bg-sakhi-50 text-sakhi-700 font-medium' 
                     : 'border-gray-200 bg-gray-50 text-gray-600'}
@@ -100,7 +126,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ userProfile, onSave }
               </button>
               <button
                 onClick={() => setDiet('non-vegetarian')}
-                className={`p-3 rounded-xl border transition-all flex flex-col items-center gap-2
+                className={`p-3 rounded-xl border transition-all flex flex-col items-center gap-2 active:scale-[0.98]
                   ${diet === 'non-vegetarian' 
                     ? 'border-sakhi-500 bg-sakhi-50 text-sakhi-700 font-medium' 
                     : 'border-gray-200 bg-gray-50 text-gray-600'}
@@ -114,7 +140,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ userProfile, onSave }
          </div>
 
          {/* Symptom History Timeline */}
-         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 animate-slide-up" style={{animationDelay: '0.4s'}}>
             <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <Activity size={18} className="text-sakhi-400" /> Symptom History
             </h3>
@@ -153,7 +179,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ userProfile, onSave }
          {/* Save Button */}
          <button
             onClick={handleSave}
-            className={`w-full py-4 rounded-xl font-bold text-white shadow-lg flex items-center justify-center gap-2 transition-all
+            className={`w-full py-4 rounded-xl font-bold text-white shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98] mb-8
               ${isSaved ? 'bg-green-500' : 'bg-gray-900 hover:bg-gray-800'}
             `}
          >

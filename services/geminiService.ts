@@ -65,6 +65,7 @@ const buildSystemContext = (profile: UserProfile) => {
     ${SAKHI_SYSTEM_INSTRUCTION}
     
     CURRENT USER CONTEXT:
+    - Language Preference: ${profile.language || 'English'} (Reply in this language, using appropriate script or Hinglish/Code-mixed style for Indian languages if that is natural for chat).
     - Last Period Date: ${profile.lastPeriodDate}
     - Cycle Length: ${profile.cycleLength} days
     - Diet: ${profile.dietPreference}

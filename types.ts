@@ -7,6 +7,8 @@ export interface Message {
 
 export type DietPreference = 'vegetarian' | 'non-vegetarian';
 
+export type Language = 'english' | 'hindi' | 'telugu' | 'tamil' | 'kannada';
+
 export interface SymptomEntry {
   date: string; // ISO Date string (YYYY-MM-DD)
   symptom: string;
@@ -20,6 +22,7 @@ export interface UserProfile {
   symptomHistory: SymptomEntry[]; // List of logged symptoms
   cycleLength: number;
   dietPreference: DietPreference;
+  language: Language;
   onboardingComplete: boolean;
 }
 

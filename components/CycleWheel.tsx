@@ -7,6 +7,7 @@ interface CycleWheelProps {
 }
 
 const CycleWheel: React.FC<CycleWheelProps> = ({ status }) => {
+  // Use viewBox for responsiveness instead of hardcoded width/height
   const size = 280;
   const center = size / 2;
   const radius = 120;
@@ -15,32 +16,16 @@ const CycleWheel: React.FC<CycleWheelProps> = ({ status }) => {
   
   // Calculate stroke dash based on 28 day cycle for visualization
   const standardCycle = 28;
-  const segmentSize = circumference / standardCycle;
 
-  // Helper to create arc path
-  const createArc = (startDay: number, endDay: number, color: string) => {
-    // This is a simplified visualization assuming a standard 28 day visual ring
-    // independent of user actual cycle length to keep the UI clean
-    const startAngle = ((startDay - 1) / standardCycle) * 360;
-    const endAngle = (endDay / standardCycle) * 360;
-    
-    // CSS Conic gradients are easier for full rings than SVG paths for this specific "segment" look
-    // But SVG allows better interaction if needed later.
-    // Let's use a simpler approach: SVG circles with dasharray
-    
-    // Actually, for a clean look, let's just render the 'active' day progress
-    return null; 
-  };
-  
   const phaseConfig = Object.values(PHASES).find(p => 
     status.day >= p.start && status.day <= p.end
   ) || PHASES.LUTEAL;
 
   return (
-    <div className="relative flex flex-col items-center justify-center py-6">
-      <div className="relative" style={{ width: size, height: size }}>
+    <div className="relative flex flex-col items-center justify-center py-6 w-full">
+      <div className="relative w-full max-w-[280px] aspect-square">
         {/* Background Track */}
-        <svg width={size} height={size} className="transform -rotate-90">
+        <svg viewBox={`0 0 ${size} ${size}`} className="transform -rotate-90 w-full h-full">
             <circle
                 cx={center}
                 cy={center}
@@ -67,11 +52,11 @@ const CycleWheel: React.FC<CycleWheelProps> = ({ status }) => {
 
         {/* Center Content */}
         <div className="absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center">
-            <h2 className="text-4xl font-bold text-gray-800">Day {status.day}</h2>
-            <p className="text-sm font-medium uppercase tracking-wide mt-1" style={{ color: phaseConfig.color }}>
+            <h2 className="text-4xl font-bold text-gray-800 animate-fade-in">Day {status.day}</h2>
+            <p className="text-sm font-medium uppercase tracking-wide mt-1 animate-fade-in" style={{ color: phaseConfig.color, animationDelay: '0.2s' }}>
                 {status.phase} Phase
             </p>
-            <div className="mt-4 text-center">
+            <div className="mt-4 text-center animate-fade-in" style={{animationDelay: '0.4s'}}>
                 <p className="text-gray-500 text-xs">Next Period in</p>
                 <p className="text-xl font-semibold text-gray-700">{status.daysUntilNext} Days</p>
             </div>
@@ -79,7 +64,7 @@ const CycleWheel: React.FC<CycleWheelProps> = ({ status }) => {
       </div>
       
       {/* Legend */}
-      <div className="flex gap-3 mt-4 text-xs text-gray-600">
+      <div className="flex gap-3 mt-4 text-xs text-gray-600 animate-fade-in" style={{animationDelay: '0.5s'}}>
         <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full bg-red-500"></div>
             <span>Period</span>

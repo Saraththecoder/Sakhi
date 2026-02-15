@@ -22,6 +22,10 @@ export const getProfile = (): UserProfile | null => {
     if (!profile.symptomHistory) {
       profile.symptomHistory = [];
     }
+    // Backward compatibility: ensure language exists
+    if (!profile.language) {
+      profile.language = 'english';
+    }
     return profile;
   } catch (e) {
     console.error("Failed to load profile", e);

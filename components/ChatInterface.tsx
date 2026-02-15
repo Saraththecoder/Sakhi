@@ -3,6 +3,7 @@ import { Message, UserProfile } from '../types';
 import { Send, Mic, Sparkles, StopCircle, ChevronLeft, Calendar, X } from 'lucide-react';
 import { sendMessageToGemini, initializeChat } from '../services/geminiService';
 import { saveMessages } from '../services/storageService';
+import { LANGUAGES } from '../constants';
 
 // --- Type Definitions for Web Speech API ---
 interface SpeechRecognitionEvent extends Event {
@@ -122,7 +123,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialMessages, userProf
         recognitionRef.current = new SpeechRecognition();
         recognitionRef.current.continuous = false;
         recognitionRef.current.interimResults = false;
-        recognitionRef.current.lang = 'en-IN'; // Indian English for better accent recognition
+        
+        // Set language from profile
+        const langConfig = LANGUAGES.find(l => l.code === userProfile.language);
+        recognitionRef.current.lang = langConfig ? langConfig.speechCode : 'en-IN';
 
         recognitionRef.current.onresult = (event) => {
             const transcript = event.results[0][0].transcript;
@@ -146,7 +150,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialMessages, userProf
             setIsRecording(false);
         };
     }
-  }, []);
+  }, [userProfile.language]); // Re-initialize if language changes
 
   const handleSend = async (textOverride?: string) => {
     const textToSend = textOverride || inputText;
@@ -222,10 +226,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialMessages, userProf
   return (
     <div className="flex flex-col h-full bg-gray-50 relative z-30">
       {/* Header */}
-      <div className="bg-white p-4 shadow-sm border-b flex items-center gap-3 sticky top-0 z-10">
+      <div className="bg-white p-4 shadow-sm border-b flex items-center gap-3 sticky top-0 z-10 safe-top">
         <button 
           onClick={onBack}
-          className="p-2 -ml-2 rounded-full hover:bg-gray-100 text-gray-600 transition-colors"
+          className="p-2 -ml-2 rounded-full hover:bg-gray-100 text-gray-600 transition-colors active:scale-95"
         >
           <ChevronLeft size={24} />
         </button>
@@ -236,7 +240,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialMessages, userProf
             <h2 className="font-bold text-gray-800">Sakhi</h2>
             <div className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                <p className="text-xs text-green-600 font-medium">Online</p>
+                <p className="text-xs text-green-600 font-medium">
+                  {LANGUAGES.find(l => l.code === userProfile.language)?.label || 'Online'}
+                </p>
             </div>
         </div>
       </div>
@@ -244,27 +250,30 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialMessages, userProf
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-2">
-                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm border border-sakhi-100 mb-2">
+            <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-2 animate-fade-in">
+                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm border border-sakhi-100 mb-2 animate-pulse-slow">
                     <Sparkles size={32} className="text-sakhi-400" />
                 </div>
                 <p className="font-medium text-gray-500">Ask me anything about your health!</p>
                 <div className="flex gap-2 mt-4 flex-wrap justify-center px-4">
                     <button 
                         onClick={() => handleQuickAction("What should I eat today?")} 
-                        className="text-xs bg-white border border-gray-200 px-3 py-1.5 rounded-full hover:bg-sakhi-50 hover:border-sakhi-200 hover:text-sakhi-600 transition-all shadow-sm"
+                        className="text-xs bg-white border border-gray-200 px-3 py-1.5 rounded-full hover:bg-sakhi-50 hover:border-sakhi-200 hover:text-sakhi-600 transition-all shadow-sm active:scale-95 animate-slide-up"
+                        style={{animationDelay: '0.1s'}}
                     >
                         🥗 Diet Tips
                     </button>
                     <button 
                         onClick={() => handleQuickAction("I have cramps, what should I do?")} 
-                        className="text-xs bg-white border border-gray-200 px-3 py-1.5 rounded-full hover:bg-sakhi-50 hover:border-sakhi-200 hover:text-sakhi-600 transition-all shadow-sm"
+                        className="text-xs bg-white border border-gray-200 px-3 py-1.5 rounded-full hover:bg-sakhi-50 hover:border-sakhi-200 hover:text-sakhi-600 transition-all shadow-sm active:scale-95 animate-slide-up"
+                        style={{animationDelay: '0.2s'}}
                     >
                         💊 Pain Relief
                     </button>
                     <button 
                         onClick={() => handleQuickAction("My period started today")} 
-                        className="text-xs bg-white border border-gray-200 px-3 py-1.5 rounded-full hover:bg-sakhi-50 hover:border-sakhi-200 hover:text-sakhi-600 transition-all shadow-sm"
+                        className="text-xs bg-white border border-gray-200 px-3 py-1.5 rounded-full hover:bg-sakhi-50 hover:border-sakhi-200 hover:text-sakhi-600 transition-all shadow-sm active:scale-95 animate-slide-up"
+                        style={{animationDelay: '0.3s'}}
                     >
                         📅 Log Period
                     </button>
@@ -272,10 +281,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialMessages, userProf
             </div>
         )}
         
-        {messages.map((msg) => (
+        {messages.map((msg, index) => (
           <div
             key={msg.id}
-            className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-slide-up`}
           >
             <div
               className={`max-w-[85%] rounded-2xl p-3 px-4 text-[15px] shadow-sm whitespace-pre-wrap leading-relaxed ${
@@ -289,7 +298,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialMessages, userProf
           </div>
         ))}
         {isLoading && (
-          <div className="flex justify-start">
+          <div className="flex justify-start animate-fade-in">
             <div className="bg-white rounded-2xl p-4 rounded-bl-none border border-gray-100 flex gap-1.5 items-center shadow-sm">
               <span className="w-1.5 h-1.5 bg-sakhi-400 rounded-full animate-bounce"></span>
               <span className="w-1.5 h-1.5 bg-sakhi-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></span>
@@ -301,11 +310,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialMessages, userProf
       </div>
 
       {/* Input Area & Prompts */}
-      <div className="bg-white border-t border-gray-100 safe-bottom relative shadow-[0_-5px_15px_-5px_rgba(0,0,0,0.05)] z-20">
+      <div className="bg-white border-t border-gray-100 safe-bottom relative shadow-[0_-5px_15px_-5px_rgba(0,0,0,0.05)] z-20 pb-safe-bottom">
         {/* Period Prompt Banner */}
         {showLogPrompt && (
             <div className="absolute bottom-full left-0 w-full px-4 pb-2 bg-gradient-to-t from-gray-50 to-transparent pt-4">
-                <div className="bg-white border border-sakhi-200 rounded-xl shadow-lg p-3 flex items-center justify-between animate-in slide-in-from-bottom-2 fade-in duration-300">
+                <div className="bg-white border border-sakhi-200 rounded-xl shadow-lg p-3 flex items-center justify-between animate-slide-up">
                      <div className="flex items-center gap-3">
                         <div className="bg-sakhi-50 p-2 rounded-full text-sakhi-500">
                              <Calendar size={18} />
@@ -318,7 +327,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialMessages, userProf
                      <div className="flex gap-2">
                          <button 
                             onClick={() => setShowLogPrompt(false)}
-                            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 active:bg-gray-200"
                          >
                             <X size={16} />
                          </button>
@@ -337,10 +346,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialMessages, userProf
         )}
 
         <div className="p-3 sm:p-4 pb-6">
-            <div className="relative flex items-end gap-2 bg-gray-50 border border-gray-200 rounded-[26px] p-1.5 focus-within:ring-2 focus-within:ring-sakhi-100 focus-within:border-sakhi-300 transition-all">
+            <div className="relative flex items-end gap-2 bg-gray-50 border border-gray-200 rounded-[26px] p-1.5 focus-within:ring-2 focus-within:ring-sakhi-100 focus-within:border-sakhi-300 transition-all shadow-sm hover:shadow-md">
                 <button 
                     onClick={toggleRecording}
-                    className={`flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 flex-shrink-0 ${
+                    className={`flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 flex-shrink-0 active:scale-90 ${
                         isRecording 
                         ? 'bg-red-500 text-white shadow-md animate-pulse' 
                         : 'text-gray-400 hover:text-sakhi-600 hover:bg-white hover:shadow-sm'
@@ -363,9 +372,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialMessages, userProf
                 <button 
                     onClick={() => handleSend()}
                     disabled={!inputText.trim() || isLoading}
-                    className={`flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 flex-shrink-0 ${
+                    className={`flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 flex-shrink-0 active:scale-90 ${
                         inputText.trim() 
-                            ? 'bg-sakhi-500 text-white shadow-md hover:bg-sakhi-600 hover:scale-105 active:scale-95' 
+                            ? 'bg-sakhi-500 text-white shadow-md hover:bg-sakhi-600' 
                             : 'bg-gray-200 text-gray-400 cursor-default'
                     }`}
                 >
@@ -374,7 +383,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialMessages, userProf
             </div>
             {isRecording && (
                 <p className="text-[10px] text-center text-red-500 mt-2 animate-pulse font-medium">
-                    Listening... tap microphone to stop
+                    Listening ({LANGUAGES.find(l => l.code === userProfile.language)?.label})... tap mic to stop
                 </p>
             )}
         </div>
