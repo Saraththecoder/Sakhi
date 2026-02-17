@@ -1,17 +1,19 @@
+
 import React, { useState, useEffect } from 'react';
-import { UserProfile, Message } from './types';
+import { UserProfile, Message, Mood } from './types';
 import { saveProfile, getProfile, getMessages, calculateCycleStatus } from './services/storageService';
 import Onboarding from './components/Onboarding';
 import ChatInterface from './components/ChatInterface';
 import CycleWheel from './components/CycleWheel';
 import ProfileSettings from './components/ProfileSettings';
-import { Home, MessageCircle, Info, Settings } from 'lucide-react';
-import { INSIGHT_TRANSLATIONS } from './constants';
+import { Home, MessageCircle, Info, Settings, Heart, Smile, Frown, Coffee, Battery, Zap } from 'lucide-react';
+import { INSIGHT_TRANSLATIONS, MOOD_RECOMMENDATIONS } from './constants';
 
 const App: React.FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'profile'>('home');
   const [loaded, setLoaded] = useState(false);
+  const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
 
   // Load profile on mount
   useEffect(() => {
@@ -52,6 +54,11 @@ const App: React.FC = () => {
 
   // Get localized strings
   const translation = INSIGHT_TRANSLATIONS[userProfile.language] || INSIGHT_TRANSLATIONS.english;
+  
+  // Get Mood Recommendation based on selection
+  const moodData = selectedMood && userProfile 
+    ? MOOD_RECOMMENDATIONS[userProfile.language][selectedMood] 
+    : null;
 
   return (
     // Use h-[100dvh] for dynamic viewport height on mobile browsers
@@ -81,12 +88,67 @@ const App: React.FC = () => {
                     <CycleWheel status={cycleStatus} />
                 </div>
 
+                {/* Mood Tracker Section */}
                 <div className="px-6 mt-6 animate-slide-up" style={{animationDelay: '0.1s'}}>
+                    <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                        <Heart size={18} className="text-sakhi-500" />
+                        {translation.moodTitle || "How are you feeling?"}
+                    </h3>
+                    
+                    <div className="flex justify-between gap-2 overflow-x-auto no-scrollbar pb-2">
+                         {[
+                            { id: 'happy', icon: <Smile size={24} />, label: 'Happy', color: 'text-yellow-500 bg-yellow-50' },
+                            { id: 'sad', icon: <Frown size={24} />, label: 'Low', color: 'text-blue-500 bg-blue-50' },
+                            { id: 'irritated', icon: <Zap size={24} />, label: 'Angry', color: 'text-red-500 bg-red-50' },
+                            { id: 'tired', icon: <Battery size={24} />, label: 'Tired', color: 'text-purple-500 bg-purple-50' },
+                            { id: 'cramps', icon: <Coffee size={24} />, label: 'Pain', color: 'text-orange-500 bg-orange-50' },
+                         ].map((mood) => (
+                             <button
+                                key={mood.id}
+                                onClick={() => setSelectedMood(mood.id as Mood)}
+                                className={`flex flex-col items-center gap-1 min-w-[60px] p-2 rounded-xl transition-all active:scale-95 ${
+                                    selectedMood === mood.id 
+                                    ? `ring-2 ring-sakhi-400 ${mood.color} shadow-sm` 
+                                    : 'hover:bg-gray-50 text-gray-400 grayscale hover:grayscale-0'
+                                }`}
+                             >
+                                <div className={`p-2 rounded-full ${selectedMood === mood.id ? '' : 'bg-gray-100'}`}>
+                                    {mood.icon}
+                                </div>
+                                <span className="text-[10px] font-medium">{mood.label}</span>
+                             </button>
+                         ))}
+                    </div>
+
+                    {selectedMood && moodData && (
+                        <div className="mt-4 bg-gradient-to-br from-sakhi-50 to-white border border-sakhi-100 p-4 rounded-xl shadow-sm animate-fade-in relative overflow-hidden">
+                             <div className="absolute top-0 right-0 w-16 h-16 bg-sakhi-100 rounded-full -mr-6 -mt-6 opacity-50"></div>
+                             
+                             <p className="text-sakhi-700 font-medium text-sm mb-2 relative z-10">
+                                {moodData.message}
+                             </p>
+                             <div className="flex items-start gap-3 mt-3 bg-white/60 p-3 rounded-lg border border-sakhi-50">
+                                <span className="text-2xl pt-1">
+                                    {userProfile.dietPreference === 'vegetarian' ? '🥗' : '🍲'}
+                                </span>
+                                <div>
+                                    <p className="text-xs text-sakhi-400 font-bold uppercase tracking-wide">Food Recommendation</p>
+                                    <p className="text-gray-800 text-sm font-medium leading-snug mt-0.5">
+                                        {userProfile.dietPreference === 'vegetarian' ? moodData.veg : moodData.nonVeg}
+                                    </p>
+                                </div>
+                             </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Daily Insight Section */}
+                <div className="px-6 mt-6 mb-4 animate-slide-up" style={{animationDelay: '0.2s'}}>
                     <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                         <Info size={18} className="text-sakhi-500"/>
                         {translation.title}
                     </h3>
-                    <div className="bg-sakhi-50 border border-sakhi-100 p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                    <div className="bg-white border border-gray-100 p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow">
                         <p className="text-gray-700 text-sm leading-relaxed">
                             {cycleStatus.phase === 'Menstrual' && translation.menstrual}
                             {cycleStatus.phase === 'Follicular' && translation.follicular}
@@ -96,7 +158,7 @@ const App: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="px-6 mt-6 mb-4 animate-slide-up" style={{animationDelay: '0.2s'}}>
+                <div className="px-6 mt-2 mb-4 animate-slide-up" style={{animationDelay: '0.3s'}}>
                     <button 
                         onClick={() => setActiveTab('chat')}
                         className="w-full bg-gray-900 text-white py-4 rounded-xl font-medium shadow-lg hover:bg-gray-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group"

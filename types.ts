@@ -1,3 +1,4 @@
+
 export interface Message {
   id: string;
   text: string;
@@ -8,6 +9,8 @@ export interface Message {
 export type DietPreference = 'vegetarian' | 'non-vegetarian';
 
 export type Language = 'english' | 'hindi' | 'telugu' | 'tamil' | 'kannada';
+
+export type Mood = 'happy' | 'sad' | 'irritated' | 'tired' | 'cramps';
 
 export interface SymptomEntry {
   date: string; // ISO Date string (YYYY-MM-DD)
