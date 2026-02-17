@@ -1,25 +1,41 @@
-import { GoogleGenAI, Chat, FunctionDeclaration, Type } from "@google/genai";
+import { GoogleGenAI, Chat, FunctionDeclaration, Type, GenerateContentResponse, Part, Content } from "@google/genai";
 import { SAKHI_SYSTEM_INSTRUCTION } from "../constants";
 import { UserProfile, Message } from "../types";
 import { addPeriodDate, logSymptom } from "./storageService";
 
-// The API key must be obtained exclusively from the environment variable process.env.API_KEY.
-// We strictly rely on the environment variable injection.
-const apiKey = process.env.API_KEY;
-
-if (!apiKey) {
-    console.warn("API Key not found in process.env.API_KEY. Chat functionality will be limited.");
-}
-
-let ai: GoogleGenAI | null = null;
 let chatSession: Chat | null = null;
 let currentUserProfile: UserProfile | null = null;
 
-if (apiKey) {
-  ai = new GoogleGenAI({ apiKey });
-}
+// --- Helper to safely retrieve API Key from various environments ---
+const getApiKey = (): string | undefined => {
+  // 1. Try standard process.env (Node/Webpack/CRA)
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      if (process.env.API_KEY) return process.env.API_KEY;
+      if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
+      if (process.env.VITE_API_KEY) return process.env.VITE_API_KEY;
+    }
+  } catch (e) {
+    // process might not be defined in strict browser environments
+  }
 
-// Tool Definitions
+  // 2. Try import.meta.env (Vite/Modern Bundlers)
+  try {
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      // @ts-ignore
+      if (import.meta.env.API_KEY) return import.meta.env.API_KEY;
+      // @ts-ignore
+      if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
+    }
+  } catch (e) {
+    // import.meta might not be supported
+  }
+
+  return undefined;
+};
+
+// --- Tool Definitions ---
 const updatePeriodTool: FunctionDeclaration = {
   name: 'updatePeriodDate',
   description: 'Update the user\'s period start date when they report their period has started.',
@@ -73,15 +89,19 @@ const buildSystemContext = (profile: UserProfile) => {
 };
 
 export const initializeChat = async (history: Message[], userProfile: UserProfile) => {
-  if (!ai) return;
+  const apiKey = getApiKey();
+  if (!apiKey) {
+      console.warn("API Key missing during initialization. Chat will fail if attempted.");
+      return;
+  }
+
   currentUserProfile = userProfile;
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
-    // Transform internal message format to Gemini format
-    // Filter out potential bad states (e.g. empty text)
     const validHistory = history.filter(h => h.text && h.text.trim() !== '');
     
-    const recentHistory = validHistory.slice(-15).map(msg => ({
+    const geminiHistory: Content[] = validHistory.slice(-15).map(msg => ({
       role: msg.sender === 'sakhi' ? 'model' : 'user',
       parts: [{ text: msg.text }],
     }));
@@ -90,16 +110,14 @@ export const initializeChat = async (history: Message[], userProfile: UserProfil
 
     chatSession = ai.chats.create({
       model: 'gemini-3-flash-preview',
-      history: recentHistory,
+      history: geminiHistory,
       config: {
         systemInstruction: systemContext,
-        temperature: 0.7,
         tools: [{ functionDeclarations: [updatePeriodTool, logSymptomTool] }],
       },
     });
   } catch (error) {
     console.error("Failed to initialize chat session:", error);
-    // Fallback: Try creating session without history if history was corrupt
     try {
         chatSession = ai.chats.create({
             model: 'gemini-3-flash-preview',
@@ -115,7 +133,13 @@ export const initializeChat = async (history: Message[], userProfile: UserProfil
 };
 
 export const sendMessageToGemini = async (text: string): Promise<string> => {
-  if (!ai) return "Configuration Error: API Key is missing. Please ensure process.env.API_KEY is set.";
+  const apiKey = getApiKey();
+  
+  if (!apiKey) {
+    return "Configuration Error: API Key is missing. If you are using Vite, try naming it 'VITE_API_KEY' in your .env file.";
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
 
   // Auto-recover session if missing
   if (!chatSession) {
@@ -138,49 +162,50 @@ export const sendMessageToGemini = async (text: string): Promise<string> => {
   }
 
   try {
-    let response = await chatSession.sendMessage({ message: text });
+    let response: GenerateContentResponse = await chatSession.sendMessage({ message: text });
     
-    // Handle Function Calls
-    const functionCalls = response.functionCalls;
-
-    if (functionCalls && functionCalls.length > 0) {
-      const parts = [];
+    // Handle Function Calls (Loop for chained tools)
+    let functionCalls = response.functionCalls;
+    
+    while (functionCalls && functionCalls.length > 0) {
+      const parts: Part[] = [];
       
       for (const call of functionCalls) {
-        if (call.name === 'updatePeriodDate') {
-           const args = call.args as { date: string };
-           console.log("Executing tool updatePeriodDate with", args);
-           
-           addPeriodDate(args.date);
-           
-           parts.push({
-             functionResponse: {
-               name: call.name,
-               id: call.id,
-               response: { result: "Period date updated successfully. Cycle length recalculated." }
-             }
-           });
-        } else if (call.name === 'logSymptom') {
-           const args = call.args as { symptomName: string };
-           console.log("Executing tool logSymptom with", args);
-           
-           logSymptom(args.symptomName);
-
-           parts.push({
-             functionResponse: {
-               name: call.name,
-               id: call.id,
-               response: { result: `Symptom '${args.symptomName}' logged successfully for today.` }
-             }
-           });
+        let functionResult: any = {};
+        
+        try {
+            if (call.name === 'updatePeriodDate') {
+               const args = call.args as { date: string };
+               console.log("Executing tool updatePeriodDate with", args);
+               addPeriodDate(args.date);
+               functionResult = { result: "Period date updated successfully. Cycle length recalculated." };
+            } else if (call.name === 'logSymptom') {
+               const args = call.args as { symptomName: string };
+               console.log("Executing tool logSymptom with", args);
+               logSymptom(args.symptomName);
+               functionResult = { result: `Symptom '${args.symptomName}' logged successfully for today.` };
+            } else {
+               functionResult = { error: `Function ${call.name} not found` };
+            }
+        } catch (err: any) {
+             console.error(`Error executing ${call.name}:`, err);
+             functionResult = { error: err.message };
         }
+
+        parts.push({
+             functionResponse: {
+               name: call.name,
+               id: call.id,
+               response: functionResult
+             }
+        });
       }
 
       if (parts.length > 0) {
-         // Send the function execution result back to the model
-         response = await chatSession.sendMessage({
-           message: parts
-         });
+         response = await chatSession.sendMessage({ message: parts });
+         functionCalls = response.functionCalls;
+      } else {
+         break;
       }
     }
 
@@ -188,14 +213,12 @@ export const sendMessageToGemini = async (text: string): Promise<string> => {
   } catch (error) {
     console.error("Gemini API Error:", error);
     
-    // Reset session on fatal error to prevent stuck state
-    chatSession = null; 
-    
-    // Check if error is related to quota or invalid key
-    if (JSON.stringify(error).includes("429")) {
+    const errStr = String(error);
+    if (errStr.includes("429") || errStr.includes("quota")) {
         return "I'm a bit overwhelmed right now (Quota Limit). Please try again in a minute! ⏳";
     }
     
+    chatSession = null; 
     return "Sorry, I'm having trouble connecting right now. Please check your internet connection and try again. 💙";
   }
 };
