@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserProfile, Message, Mood } from './types';
-import { saveProfile, getProfile, getMessages, calculateCycleStatus } from './services/storageService';
+import { saveProfile, getProfile, getMessages, calculateCycleStatus, logSymptom } from './services/storageService';
 import Onboarding from './components/Onboarding';
 import ChatInterface from './components/ChatInterface';
 import CycleWheel from './components/CycleWheel';
 import ProfileSettings from './components/ProfileSettings';
-import { Home, MessageCircle, Info, Settings, Heart, Smile, Frown, Coffee, Battery, Zap } from 'lucide-react';
+import { Home, MessageCircle, Info, Settings, Heart, Smile, Frown, Coffee, Battery, Zap, Activity } from 'lucide-react';
 import { INSIGHT_TRANSLATIONS, MOOD_RECOMMENDATIONS } from './constants';
 
 const App: React.FC = () => {
@@ -14,6 +14,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'profile'>('home');
   const [loaded, setLoaded] = useState(false);
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
+  const [initialChatInput, setInitialChatInput] = useState('');
 
   // Load profile on mount
   useEffect(() => {
@@ -41,6 +42,24 @@ const App: React.FC = () => {
   const handleSaveProfile = (updatedProfile: UserProfile) => {
     saveProfile(updatedProfile);
     setUserProfile(updatedProfile);
+  };
+
+  const handleMoodSelect = (mood: Mood) => {
+      setSelectedMood(mood);
+      
+      // Auto-log physical symptoms silently
+      if (mood === 'cramps' || mood === 'tired' || mood === 'irritated') {
+          logSymptom(mood);
+          refreshProfile(); // Update local state to show it in history if needed
+      }
+  };
+
+  const handleChatAboutMood = () => {
+      if (selectedMood && userProfile) {
+          const moodLabel = selectedMood.charAt(0).toUpperCase() + selectedMood.slice(1);
+          setInitialChatInput(`I am feeling ${moodLabel} today. Do you have any advice?`);
+          setActiveTab('chat');
+      }
   };
 
   if (!loaded) return null;
@@ -105,7 +124,7 @@ const App: React.FC = () => {
                          ].map((mood) => (
                              <button
                                 key={mood.id}
-                                onClick={() => setSelectedMood(mood.id as Mood)}
+                                onClick={() => handleMoodSelect(mood.id as Mood)}
                                 className={`flex flex-col items-center gap-1 min-w-[60px] p-2 rounded-xl transition-all active:scale-95 ${
                                     selectedMood === mood.id 
                                     ? `ring-2 ring-sakhi-400 ${mood.color} shadow-sm` 
@@ -127,7 +146,9 @@ const App: React.FC = () => {
                              <p className="text-sakhi-700 font-medium text-sm mb-2 relative z-10">
                                 {moodData.message}
                              </p>
-                             <div className="flex items-start gap-3 mt-3 bg-white/60 p-3 rounded-lg border border-sakhi-50">
+                             
+                             {/* Food Tip */}
+                             <div className="flex items-start gap-3 mt-3 bg-white/60 p-3 rounded-lg border border-sakhi-50 relative z-10">
                                 <span className="text-2xl pt-1">
                                     {userProfile.dietPreference === 'vegetarian' ? '🥗' : '🍲'}
                                 </span>
@@ -138,6 +159,28 @@ const App: React.FC = () => {
                                     </p>
                                 </div>
                              </div>
+
+                             {/* Activity Tip */}
+                             {moodData.activity && (
+                                 <div className="flex items-start gap-3 mt-2 bg-white/60 p-3 rounded-lg border border-sakhi-50 relative z-10">
+                                    <span className="text-2xl pt-1">🧘‍♀️</span>
+                                    <div>
+                                        <p className="text-xs text-sakhi-400 font-bold uppercase tracking-wide">Activity Tip</p>
+                                        <p className="text-gray-800 text-sm font-medium leading-snug mt-0.5">
+                                            {moodData.activity}
+                                        </p>
+                                    </div>
+                                 </div>
+                             )}
+
+                             {/* Call to Action */}
+                             <button 
+                                onClick={handleChatAboutMood}
+                                className="w-full mt-3 py-2 bg-white text-sakhi-600 border border-sakhi-100 rounded-lg text-xs font-semibold shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 hover:bg-sakhi-50"
+                             >
+                                <MessageCircle size={14} />
+                                Chat with Sakhi about this
+                             </button>
                         </div>
                     )}
                 </div>
@@ -160,7 +203,10 @@ const App: React.FC = () => {
 
                 <div className="px-6 mt-2 mb-4 animate-slide-up" style={{animationDelay: '0.3s'}}>
                     <button 
-                        onClick={() => setActiveTab('chat')}
+                        onClick={() => {
+                            setInitialChatInput('');
+                            setActiveTab('chat');
+                        }}
                         className="w-full bg-gray-900 text-white py-4 rounded-xl font-medium shadow-lg hover:bg-gray-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group"
                     >
                         <MessageCircle size={20} className="group-hover:scale-110 transition-transform"/>
@@ -175,9 +221,11 @@ const App: React.FC = () => {
                 <ChatInterface 
                     initialMessages={messages} 
                     userProfile={userProfile} 
+                    initialInput={initialChatInput}
                     onProfileUpdate={handleProfileUpdate}
                     onBack={() => {
                         refreshProfile();
+                        setInitialChatInput('');
                         setActiveTab('home');
                     }}
                 />
@@ -208,7 +256,10 @@ const App: React.FC = () => {
             </button>
             
             <button 
-                onClick={() => setActiveTab('chat')}
+                onClick={() => {
+                    setInitialChatInput('');
+                    setActiveTab('chat');
+                }}
                 className={`flex flex-col items-center gap-1 transition-all w-16 text-gray-400 active:scale-95 hover:text-sakhi-400`}
             >
                 <div className="p-1 rounded-full">

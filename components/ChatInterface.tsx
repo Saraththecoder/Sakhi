@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Message, UserProfile } from '../types';
 import { Send, Mic, Sparkles, StopCircle, ChevronLeft, Calendar, X } from 'lucide-react';
@@ -61,13 +62,14 @@ declare global {
 interface ChatInterfaceProps {
   initialMessages: Message[];
   userProfile: UserProfile;
+  initialInput?: string;
   onProfileUpdate?: () => void;
   onBack: () => void;
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialMessages, userProfile, onProfileUpdate, onBack }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialMessages, userProfile, initialInput = '', onProfileUpdate, onBack }) => {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [inputText, setInputText] = useState('');
+  const [inputText, setInputText] = useState(initialInput);
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [showLogPrompt, setShowLogPrompt] = useState(false);
@@ -98,6 +100,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialMessages, userProf
     initializeChat(messages, userProfile);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); 
+
+  // Initialize input height if there is initial input
+  useEffect(() => {
+      if (initialInput && textareaRef.current) {
+         textareaRef.current.style.height = 'auto';
+         textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
+      }
+  }, [initialInput]);
 
   // Check if we should show period prompt
   useEffect(() => {
