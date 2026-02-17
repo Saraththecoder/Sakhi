@@ -1,172 +1,201 @@
-import { GoogleGenAI, Type, FunctionDeclaration, Content, Part, GenerateContentResponse, Chat } from "@google/genai";
+import { GoogleGenAI, Chat, FunctionDeclaration, Type } from "@google/genai";
 import { SAKHI_SYSTEM_INSTRUCTION } from "../constants";
 import { UserProfile, Message } from "../types";
 import { addPeriodDate, logSymptom } from "./storageService";
 
-const API_KEY = process.env.API_KEY;
+// The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+// We strictly rely on the environment variable injection.
+const apiKey = process.env.API_KEY;
 
-// Using Gemini 2.0 Flash for speed and tool capabilities
-const MODEL_NAME = "gemini-2.0-flash";
+if (!apiKey) {
+    console.warn("API Key not found in process.env.API_KEY. Chat functionality will be limited.");
+}
 
+let ai: GoogleGenAI | null = null;
 let chatSession: Chat | null = null;
 let currentUserProfile: UserProfile | null = null;
 
-// --- Tool Definitions ---
+if (apiKey) {
+  ai = new GoogleGenAI({ apiKey });
+}
 
-const updatePeriodDateTool: FunctionDeclaration = {
-  name: "updatePeriodDate",
-  description: "Update the user's period start date when they report their period has started.",
+// Tool Definitions
+const updatePeriodTool: FunctionDeclaration = {
+  name: 'updatePeriodDate',
+  description: 'Update the user\'s period start date when they report their period has started.',
   parameters: {
     type: Type.OBJECT,
     properties: {
       date: {
         type: Type.STRING,
-        description: "The start date of the period in YYYY-MM-DD format. If user says 'today', use today's date.",
+        description: 'The start date of the period in YYYY-MM-DD format. If user says "today", use today\'s date.',
       },
     },
-    required: ["date"],
+    required: ['date'],
   },
 };
 
 const logSymptomTool: FunctionDeclaration = {
-  name: "logSymptom",
-  description: "Log a health symptom reported by the user (e.g., headache, cramps, bloating).",
+  name: 'logSymptom',
+  description: 'Log a health symptom reported by the user (e.g., headache, cramps, bloating).',
   parameters: {
     type: Type.OBJECT,
     properties: {
       symptomName: {
         type: Type.STRING,
-        description: "The specific name of the symptom (e.g., 'Cramps', 'Headache', 'Fatigue').",
+        description: 'The specific name of the symptom (e.g., "Cramps", "Headache", "Fatigue").',
       },
     },
-    required: ["symptomName"],
+    required: ['symptomName'],
   },
 };
 
-// --- Helper Functions ---
+const buildSystemContext = (profile: UserProfile) => {
+    // Format recent symptoms for context
+    const recentSymptoms = profile.symptomHistory 
+        ? profile.symptomHistory.slice(0, 5).map(s => `${s.symptom} (Day ${s.cycleDay || '?'})`).join(', ') 
+        : 'None logged yet';
 
-const buildSystemContext = (profile: UserProfile): string => {
-  const recentSymptoms = profile.symptomHistory
-    ? profile.symptomHistory.slice(0, 5).map((s) => `${s.symptom} (Day ${s.cycleDay || "?"})`).join(", ")
-    : "None logged yet";
-
-  return `
+    return `
     ${SAKHI_SYSTEM_INSTRUCTION}
     
     CURRENT USER CONTEXT:
-    - Language Preference: ${profile.language || "English"} (Reply in this language, using appropriate script or Hinglish/Code-mixed style for Indian languages if that is natural for chat).
+    - Language Preference: ${profile.language || 'English'} (Reply in this language, using appropriate script or Hinglish/Code-mixed style for Indian languages if that is natural for chat).
     - Last Period Date: ${profile.lastPeriodDate}
     - Cycle Length: ${profile.cycleLength} days
     - Diet: ${profile.dietPreference}
     - Recent Symptoms: ${recentSymptoms}
-    - Today's Date: ${new Date().toLocaleDateString("en-IN")}
+    - Today's Date: ${new Date().toLocaleDateString('en-IN')}
     
     If the user reports a symptom, acknowledge it, give advice, and assume I will log it for them using the tool.
+    If the user says "voice message" or similar, keep your response concise.
   `;
 };
 
-/**
- * Initializes or resets the Gemini Chat session.
- * call this when the component mounts or when profile changes.
- */
 export const initializeChat = async (history: Message[], userProfile: UserProfile) => {
-  if (!API_KEY) {
-    console.error("API Key is missing");
-    return;
-  }
-
+  if (!ai) return;
   currentUserProfile = userProfile;
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
-  
-  const systemInstruction = buildSystemContext(userProfile);
-
-  // Convert app's internal message format to Gemini's Content format
-  const geminiHistory: Content[] = history.map(msg => ({
-      role: msg.sender === 'sakhi' ? 'model' : 'user',
-      parts: [{ text: msg.text }]
-  }));
 
   try {
+    // Transform internal message format to Gemini format
+    // Filter out potential bad states (e.g. empty text)
+    const validHistory = history.filter(h => h.text && h.text.trim() !== '');
+    
+    const recentHistory = validHistory.slice(-15).map(msg => ({
+      role: msg.sender === 'sakhi' ? 'model' : 'user',
+      parts: [{ text: msg.text }],
+    }));
+
+    const systemContext = buildSystemContext(userProfile);
+
     chatSession = ai.chats.create({
-      model: MODEL_NAME,
-      history: geminiHistory,
+      model: 'gemini-3-flash-preview',
+      history: recentHistory,
       config: {
-        systemInstruction: systemInstruction,
-        tools: [{ functionDeclarations: [updatePeriodDateTool, logSymptomTool] }]
-      }
+        systemInstruction: systemContext,
+        temperature: 0.7,
+        tools: [{ functionDeclarations: [updatePeriodTool, logSymptomTool] }],
+      },
     });
   } catch (error) {
-    console.error("Failed to initialize chat session", error);
+    console.error("Failed to initialize chat session:", error);
+    // Fallback: Try creating session without history if history was corrupt
+    try {
+        chatSession = ai.chats.create({
+            model: 'gemini-3-flash-preview',
+            config: {
+                systemInstruction: buildSystemContext(userProfile),
+                tools: [{ functionDeclarations: [updatePeriodTool, logSymptomTool] }],
+            }
+        });
+    } catch (e) {
+        console.error("Critical error creating chat session", e);
+    }
   }
 };
 
-/**
- * Sends a message to Gemini and handles any tool calls (Function Calling).
- */
 export const sendMessageToGemini = async (text: string): Promise<string> => {
-  if (!API_KEY) {
-    return "Configuration Error: API Key is missing. Please ensure process.env.API_KEY is set.";
-  }
+  if (!ai) return "Configuration Error: API Key is missing. Please ensure process.env.API_KEY is set.";
 
-  // Auto-initialize if session was lost (e.g. hot reload), though initializeChat should be called by UI
-  if (!chatSession && currentUserProfile) {
-     // We might lack history here if not explicitly passed, but we can try to recover or fail gracefully
-     // Ideally initializeChat is called before this.
-     return "Chat session expired. Please refresh the page. 🌸";
-  }
-  
+  // Auto-recover session if missing
   if (!chatSession) {
-      return "I'm warming up! Please wait a moment...";
+    const context = currentUserProfile 
+        ? buildSystemContext(currentUserProfile) 
+        : SAKHI_SYSTEM_INSTRUCTION;
+
+    try {
+        chatSession = ai.chats.create({
+            model: 'gemini-3-flash-preview',
+            config: { 
+              systemInstruction: context,
+              tools: [{ functionDeclarations: [updatePeriodTool, logSymptomTool] }]
+            }
+        });
+    } catch (e) {
+        console.error("Failed to create chat session during sendMessage", e);
+        return "I'm having trouble starting our conversation. Please try refreshing the page.";
+    }
   }
 
   try {
-    let response: GenerateContentResponse = await chatSession.sendMessage({ 
-        message: text 
-    });
+    let response = await chatSession.sendMessage({ message: text });
+    
+    // Handle Function Calls
+    const functionCalls = response.functionCalls;
 
-    // Loop to handle potential multiple function calls
-    // The model might want to call a function, get the result, and then reply.
-    while (response.functionCalls && response.functionCalls.length > 0) {
-        const functionResponseParts: Part[] = [];
+    if (functionCalls && functionCalls.length > 0) {
+      const parts = [];
+      
+      for (const call of functionCalls) {
+        if (call.name === 'updatePeriodDate') {
+           const args = call.args as { date: string };
+           console.log("Executing tool updatePeriodDate with", args);
+           
+           addPeriodDate(args.date);
+           
+           parts.push({
+             functionResponse: {
+               name: call.name,
+               id: call.id,
+               response: { result: "Period date updated successfully. Cycle length recalculated." }
+             }
+           });
+        } else if (call.name === 'logSymptom') {
+           const args = call.args as { symptomName: string };
+           console.log("Executing tool logSymptom with", args);
+           
+           logSymptom(args.symptomName);
 
-        for (const call of response.functionCalls) {
-            const name = call.name;
-            const args = call.args as any;
-            let result: any = { status: "ok" };
-            
-            console.log(`[Sakhi] Calling tool: ${name}`, args);
-
-            if (name === "updatePeriodDate") {
-                addPeriodDate(args.date);
-                result = { message: "Period date updated successfully." };
-            } else if (name === "logSymptom") {
-                logSymptom(args.symptomName);
-                result = { message: `Symptom '${args.symptomName}' logged successfully.` };
-            } else {
-                result = { error: "Function not found" };
-            }
-
-            // Construct the response part to send back to the model
-            functionResponseParts.push({
-                functionResponse: {
-                    name: name,
-                    response: result,
-                    id: call.id // Pass back the ID if provided to match the call
-                }
-            });
+           parts.push({
+             functionResponse: {
+               name: call.name,
+               id: call.id,
+               response: { result: `Symptom '${args.symptomName}' logged successfully for today.` }
+             }
+           });
         }
-        
-        // Send the function execution results back to the model
-        // The model will then generate a text response incorporating this info
-        response = await chatSession.sendMessage({ 
-            message: functionResponseParts 
-        });
+      }
+
+      if (parts.length > 0) {
+         // Send the function execution result back to the model
+         response = await chatSession.sendMessage({
+           message: parts
+         });
+      }
     }
 
-    return response.text || "I heard you, but I'm not sure what to say. 🌸";
-
+    return response.text || "I processed that, but I'm not sure what to say. 🌸";
   } catch (error) {
-    console.error("Gemini Chat Error:", error);
-    return "Sorry, I'm having trouble connecting to the cloud right now. Please check your internet connection. 💙";
+    console.error("Gemini API Error:", error);
+    
+    // Reset session on fatal error to prevent stuck state
+    chatSession = null; 
+    
+    // Check if error is related to quota or invalid key
+    if (JSON.stringify(error).includes("429")) {
+        return "I'm a bit overwhelmed right now (Quota Limit). Please try again in a minute! ⏳";
+    }
+    
+    return "Sorry, I'm having trouble connecting right now. Please check your internet connection and try again. 💙";
   }
 };
