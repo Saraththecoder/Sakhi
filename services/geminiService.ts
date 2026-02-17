@@ -3,17 +3,12 @@ import { SAKHI_SYSTEM_INSTRUCTION } from "../constants";
 import { UserProfile, Message } from "../types";
 import { addPeriodDate, logSymptom } from "./storageService";
 
-// Use the provided API key by default, allow override via environment variable
-const DEFAULT_API_KEY = "AIzaSyDveSfzNqkIkFp-m1zrlXi4O80c6DCxlZU";
-let apiKey = DEFAULT_API_KEY;
-
-// Safe access to process.env.API_KEY
-if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-  apiKey = process.env.API_KEY;
-}
+// The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+// We strictly rely on the environment variable injection.
+const apiKey = process.env.API_KEY;
 
 if (!apiKey) {
-    console.warn("API Key not found. Chat will be disabled.");
+    console.warn("API Key not found in process.env.API_KEY. Chat functionality will be limited.");
 }
 
 let ai: GoogleGenAI | null = null;
@@ -120,7 +115,7 @@ export const initializeChat = async (history: Message[], userProfile: UserProfil
 };
 
 export const sendMessageToGemini = async (text: string): Promise<string> => {
-  if (!ai) return "Configuration Error: API Key is missing or invalid.";
+  if (!ai) return "Configuration Error: API Key is missing. Please ensure process.env.API_KEY is set.";
 
   // Auto-recover session if missing
   if (!chatSession) {
@@ -128,13 +123,18 @@ export const sendMessageToGemini = async (text: string): Promise<string> => {
         ? buildSystemContext(currentUserProfile) 
         : SAKHI_SYSTEM_INSTRUCTION;
 
-    chatSession = ai.chats.create({
-        model: 'gemini-3-flash-preview',
-        config: { 
-          systemInstruction: context,
-          tools: [{ functionDeclarations: [updatePeriodTool, logSymptomTool] }]
-        }
-    });
+    try {
+        chatSession = ai.chats.create({
+            model: 'gemini-3-flash-preview',
+            config: { 
+              systemInstruction: context,
+              tools: [{ functionDeclarations: [updatePeriodTool, logSymptomTool] }]
+            }
+        });
+    } catch (e) {
+        console.error("Failed to create chat session during sendMessage", e);
+        return "I'm having trouble starting our conversation. Please try refreshing the page.";
+    }
   }
 
   try {
@@ -187,8 +187,15 @@ export const sendMessageToGemini = async (text: string): Promise<string> => {
     return response.text || "I processed that, but I'm not sure what to say. 🌸";
   } catch (error) {
     console.error("Gemini API Error:", error);
+    
     // Reset session on fatal error to prevent stuck state
     chatSession = null; 
+    
+    // Check if error is related to quota or invalid key
+    if (JSON.stringify(error).includes("429")) {
+        return "I'm a bit overwhelmed right now (Quota Limit). Please try again in a minute! ⏳";
+    }
+    
     return "Sorry, I'm having trouble connecting right now. Please check your internet connection and try again. 💙";
   }
 };
