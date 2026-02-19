@@ -1,20 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserProfile, Message, Mood } from './types';
+import { UserProfile, Mood } from './types';
 import { saveProfile, getProfile, getMessages, calculateCycleStatus, logSymptom } from './services/storageService';
 import Onboarding from './components/Onboarding';
 import ChatInterface from './components/ChatInterface';
 import CycleWheel from './components/CycleWheel';
 import ProfileSettings from './components/ProfileSettings';
-import { Home, MessageCircle, Info, Settings, Heart, Smile, Frown, Coffee, Battery, Zap, Activity } from 'lucide-react';
+import { Heart, Smile, Frown, Coffee, Battery, Zap, Info, Search, Camera, MoreVertical, MessageSquare, Phone, Activity, X } from 'lucide-react';
 import { INSIGHT_TRANSLATIONS, MOOD_RECOMMENDATIONS } from './constants';
 
 const App: React.FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'profile'>('home');
+  const [currentScreen, setCurrentScreen] = useState<'list' | 'chat'>('list');
+  const [showDashboard, setShowDashboard] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
-  const [initialChatInput, setInitialChatInput] = useState('');
 
   // Load profile on mount
   useEffect(() => {
@@ -34,7 +34,6 @@ const App: React.FC = () => {
     setUserProfile(profile);
   };
 
-  // Called when returning from Chat or when Chat triggers an update
   const handleProfileUpdate = () => {
       refreshProfile();
   };
@@ -46,19 +45,9 @@ const App: React.FC = () => {
 
   const handleMoodSelect = (mood: Mood) => {
       setSelectedMood(mood);
-      
-      // Auto-log physical symptoms silently
       if (mood === 'cramps' || mood === 'tired' || mood === 'irritated') {
           logSymptom(mood);
-          refreshProfile(); // Update local state to show it in history if needed
-      }
-  };
-
-  const handleChatAboutMood = () => {
-      if (selectedMood && userProfile) {
-          const moodLabel = selectedMood.charAt(0).toUpperCase() + selectedMood.slice(1);
-          setInitialChatInput(`I am feeling ${moodLabel} today. Do you have any advice?`);
-          setActiveTab('chat');
+          refreshProfile();
       }
   };
 
@@ -70,214 +59,203 @@ const App: React.FC = () => {
 
   const cycleStatus = calculateCycleStatus(userProfile.lastPeriodDate, userProfile.cycleLength);
   const messages = getMessages();
-
-  // Get localized strings
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
   const translation = INSIGHT_TRANSLATIONS[userProfile.language] || INSIGHT_TRANSLATIONS.english;
-  
-  // Get Mood Recommendation based on selection
-  const moodData = selectedMood && userProfile 
-    ? MOOD_RECOMMENDATIONS[userProfile.language][selectedMood] 
-    : null;
+  const moodData = selectedMood && userProfile ? MOOD_RECOMMENDATIONS[userProfile.language][selectedMood] : null;
 
   return (
-    // Use h-[100dvh] for dynamic viewport height on mobile browsers
-    <div className="flex flex-col h-[100dvh] bg-white max-w-lg mx-auto shadow-2xl overflow-hidden relative">
+    <div className="flex flex-col h-[100dvh] bg-white max-w-lg mx-auto shadow-2xl overflow-hidden relative font-sans">
       
-      {/* Content Area */}
-      <div className="flex-1 overflow-hidden relative">
-        {activeTab === 'home' && (
-            <div key="home" className="h-full overflow-y-auto no-scrollbar pb-20 animate-fade-in">
-                <div className="bg-sakhi-500 text-white p-6 pb-12 rounded-b-[2.5rem] shadow-md relative overflow-hidden">
-                    {/* Decorative circles */}
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-xl"></div>
-                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-8 -mb-8 blur-lg"></div>
+      {/* ---------------- SCREEN: CHAT LIST (MAIN WHATSAPP SCREEN) ---------------- */}
+      {currentScreen === 'list' && (
+          <div className="flex flex-col h-full bg-white">
+              {/* WA Main Header */}
+              <div className="bg-wa-teal text-white pt-safe-top sticky top-0 z-10">
+                  <div className="flex justify-between items-center p-4 pb-2">
+                      <span className="text-xl font-bold tracking-wide">WhatsApp</span>
+                      <div className="flex gap-5">
+                          <Camera size={22} />
+                          <Search size={22} />
+                          <MoreVertical size={22} />
+                      </div>
+                  </div>
+                  {/* Tabs */}
+                  <div className="flex text-gray-200 font-bold text-sm uppercase">
+                      <div className="w-10 flex justify-center items-center pb-3">
+                          <Activity size={20} className="opacity-70" />
+                      </div>
+                      <div className="flex-1 flex justify-center pb-3 border-b-[3px] border-white text-white">Chats</div>
+                      <div className="flex-1 flex justify-center pb-3 opacity-80">Status</div>
+                      <div className="flex-1 flex justify-center pb-3 opacity-80">Calls</div>
+                  </div>
+              </div>
 
-                    <div className="flex justify-between items-start mb-4 relative z-10">
-                        <div className="animate-slide-in-right">
-                            <h1 className="text-2xl font-bold">Namaste! 🌸</h1>
-                            <p className="text-sakhi-100 text-sm">Welcome back to your safe space.</p>
-                        </div>
-                        <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm animate-fade-in" style={{animationDelay: '0.2s'}}>
-                             <div className="text-xs font-medium">{userProfile.dietPreference === 'vegetarian' ? '🥗 Veg' : '🍗 Non-Veg'}</div>
-                        </div>
-                    </div>
-                </div>
+              {/* Chat List */}
+              <div className="flex-1 overflow-y-auto">
+                  {/* Chat Item: Sakhi */}
+                  <div 
+                    onClick={() => setCurrentScreen('chat')}
+                    className="flex items-center gap-3 p-3 hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors"
+                  >
+                      <div className="relative">
+                          <div className="w-12 h-12 rounded-full bg-sakhi-100 flex items-center justify-center text-xl border border-gray-100">
+                             🌸
+                          </div>
+                          {/* Online Indicator (Green Dot) - Optional in WA but good for bot */}
+                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                      </div>
+                      <div className="flex-1 border-b border-gray-100 pb-3">
+                          <div className="flex justify-between items-center mb-0.5">
+                              <span className="font-semibold text-gray-900 text-[17px]">Sakhi 🌸</span>
+                              <span className="text-xs text-green-500 font-medium">
+                                {lastMessage ? new Date(lastMessage.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'Now'}
+                              </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                                <p className="text-gray-500 text-sm truncate max-w-[200px]">
+                                    {lastMessage ? lastMessage.text : "Namaste! Tap to chat about your health."}
+                                </p>
+                                {/* Unread badge dummy */}
+                                {messages.length === 0 && (
+                                    <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-[10px] text-white font-bold">1</div>
+                                )}
+                          </div>
+                      </div>
+                  </div>
 
-                <div className="-mt-10 bg-white mx-4 rounded-2xl shadow-lg p-4 border border-gray-100 animate-slide-up relative z-20">
-                    <CycleWheel status={cycleStatus} />
-                </div>
+                  {/* Dummy Chat: Mom */}
+                  <div className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer opacity-60">
+                      <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-gray-600">
+                         M
+                      </div>
+                      <div className="flex-1 border-b border-gray-100 pb-3">
+                          <div className="flex justify-between items-center mb-0.5">
+                              <span className="font-semibold text-gray-900 text-[17px]">Mom</span>
+                              <span className="text-xs text-gray-400">Yesterday</span>
+                          </div>
+                          <p className="text-gray-500 text-sm truncate">Call me when you are free.</p>
+                      </div>
+                  </div>
+                  
+                  <div className="p-8 text-center text-xs text-gray-400 flex items-center justify-center gap-1">
+                      <span>Your personal messages are</span>
+                      <span className="text-wa-teal font-medium">end-to-end encrypted</span>
+                  </div>
+              </div>
 
-                {/* Mood Tracker Section */}
-                <div className="px-6 mt-6 animate-slide-up" style={{animationDelay: '0.1s'}}>
-                    <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                        <Heart size={18} className="text-sakhi-500" />
-                        {translation.moodTitle || "How are you feeling?"}
-                    </h3>
-                    
-                    <div className="flex justify-between gap-2 overflow-x-auto no-scrollbar pb-2">
-                         {[
-                            { id: 'happy', icon: <Smile size={24} />, label: 'Happy', color: 'text-yellow-500 bg-yellow-50' },
-                            { id: 'sad', icon: <Frown size={24} />, label: 'Low', color: 'text-blue-500 bg-blue-50' },
-                            { id: 'irritated', icon: <Zap size={24} />, label: 'Angry', color: 'text-red-500 bg-red-50' },
-                            { id: 'tired', icon: <Battery size={24} />, label: 'Tired', color: 'text-purple-500 bg-purple-50' },
-                            { id: 'cramps', icon: <Coffee size={24} />, label: 'Pain', color: 'text-orange-500 bg-orange-50' },
-                         ].map((mood) => (
-                             <button
-                                key={mood.id}
-                                onClick={() => handleMoodSelect(mood.id as Mood)}
-                                className={`flex flex-col items-center gap-1 min-w-[60px] p-2 rounded-xl transition-all active:scale-95 ${
-                                    selectedMood === mood.id 
-                                    ? `ring-2 ring-sakhi-400 ${mood.color} shadow-sm` 
-                                    : 'hover:bg-gray-50 text-gray-400 grayscale hover:grayscale-0'
-                                }`}
-                             >
-                                <div className={`p-2 rounded-full ${selectedMood === mood.id ? '' : 'bg-gray-100'}`}>
-                                    {mood.icon}
-                                </div>
-                                <span className="text-[10px] font-medium">{mood.label}</span>
-                             </button>
-                         ))}
-                    </div>
+              {/* FAB */}
+              <div className="absolute bottom-6 right-6 safe-bottom">
+                  <div className="w-14 h-14 bg-wa-teal rounded-xl rounded-tl-3xl rounded-br-3xl flex items-center justify-center shadow-lg text-white">
+                      <MessageSquare size={24} fill="white" />
+                  </div>
+              </div>
+          </div>
+      )}
 
-                    {selectedMood && moodData && (
-                        <div className="mt-4 bg-gradient-to-br from-sakhi-50 to-white border border-sakhi-100 p-4 rounded-xl shadow-sm animate-fade-in relative overflow-hidden">
-                             <div className="absolute top-0 right-0 w-16 h-16 bg-sakhi-100 rounded-full -mr-6 -mt-6 opacity-50"></div>
-                             
-                             <p className="text-sakhi-700 font-medium text-sm mb-2 relative z-10">
-                                {moodData.message}
-                             </p>
-                             
-                             {/* Food Tip */}
-                             <div className="flex items-start gap-3 mt-3 bg-white/60 p-3 rounded-lg border border-sakhi-50 relative z-10">
-                                <span className="text-2xl pt-1">
-                                    {userProfile.dietPreference === 'vegetarian' ? '🥗' : '🍲'}
-                                </span>
-                                <div>
-                                    <p className="text-xs text-sakhi-400 font-bold uppercase tracking-wide">Food Recommendation</p>
-                                    <p className="text-gray-800 text-sm font-medium leading-snug mt-0.5">
-                                        {userProfile.dietPreference === 'vegetarian' ? moodData.veg : moodData.nonVeg}
-                                    </p>
-                                </div>
-                             </div>
+      {/* ---------------- SCREEN: CHAT INTERFACE ---------------- */}
+      {currentScreen === 'chat' && (
+          <div className="h-full relative">
+              <ChatInterface 
+                 initialMessages={messages} 
+                 userProfile={userProfile} 
+                 onProfileUpdate={handleProfileUpdate}
+                 onBack={() => setCurrentScreen('list')}
+                 onOpenDashboard={() => setShowDashboard(true)}
+              />
+          </div>
+      )}
 
-                             {/* Activity Tip */}
-                             {moodData.activity && (
-                                 <div className="flex items-start gap-3 mt-2 bg-white/60 p-3 rounded-lg border border-sakhi-50 relative z-10">
-                                    <span className="text-2xl pt-1">🧘‍♀️</span>
-                                    <div>
-                                        <p className="text-xs text-sakhi-400 font-bold uppercase tracking-wide">Activity Tip</p>
-                                        <p className="text-gray-800 text-sm font-medium leading-snug mt-0.5">
-                                            {moodData.activity}
-                                        </p>
-                                    </div>
-                                 </div>
-                             )}
+      {/* ---------------- OVERLAY: HEALTH DASHBOARD (Mimics a WA Flow/Business Menu) ---------------- */}
+      {showDashboard && (
+          <div className="absolute inset-0 z-50 flex flex-col justify-end bg-black/50 animate-fade-in backdrop-blur-sm">
+              <div className="bg-white rounded-t-2xl h-[85%] w-full flex flex-col overflow-hidden animate-slide-up shadow-2xl">
+                  {/* Dashboard Header */}
+                  <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50">
+                      <div>
+                          <h2 className="text-lg font-bold text-gray-800">Health Status</h2>
+                          <p className="text-xs text-gray-500">Updates based on your cycle</p>
+                      </div>
+                      <button onClick={() => setShowDashboard(false)} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300 transition-colors">
+                          <X size={20} className="text-gray-600" />
+                      </button>
+                  </div>
 
-                             {/* Call to Action */}
-                             <button 
-                                onClick={handleChatAboutMood}
-                                className="w-full mt-3 py-2 bg-white text-sakhi-600 border border-sakhi-100 rounded-lg text-xs font-semibold shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 hover:bg-sakhi-50"
-                             >
-                                <MessageCircle size={14} />
-                                Chat with Sakhi about this
-                             </button>
-                        </div>
-                    )}
-                </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-white">
+                      {/* Cycle Wheel Section */}
+                      <div className="flex justify-center py-2">
+                         <CycleWheel status={cycleStatus} />
+                      </div>
 
-                {/* Daily Insight Section */}
-                <div className="px-6 mt-6 mb-4 animate-slide-up" style={{animationDelay: '0.2s'}}>
-                    <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                        <Info size={18} className="text-sakhi-500"/>
-                        {translation.title}
-                    </h3>
-                    <div className="bg-white border border-gray-100 p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                        <p className="text-gray-700 text-sm leading-relaxed">
-                            {cycleStatus.phase === 'Menstrual' && translation.menstrual}
-                            {cycleStatus.phase === 'Follicular' && translation.follicular}
-                            {cycleStatus.phase === 'Ovulation' && translation.ovulation}
-                            {cycleStatus.phase === 'Luteal' && translation.luteal}
-                        </p>
-                    </div>
-                </div>
+                      {/* Daily Insight */}
+                      <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl">
+                          <h3 className="font-bold text-blue-800 mb-2 flex items-center gap-2">
+                              <Info size={16} />
+                              {translation.title}
+                          </h3>
+                          <p className="text-blue-900 text-sm leading-relaxed">
+                              {cycleStatus.phase === 'Menstrual' && translation.menstrual}
+                              {cycleStatus.phase === 'Follicular' && translation.follicular}
+                              {cycleStatus.phase === 'Ovulation' && translation.ovulation}
+                              {cycleStatus.phase === 'Luteal' && translation.luteal}
+                          </p>
+                      </div>
 
-                <div className="px-6 mt-2 mb-4 animate-slide-up" style={{animationDelay: '0.3s'}}>
-                    <button 
-                        onClick={() => {
-                            setInitialChatInput('');
-                            setActiveTab('chat');
-                        }}
-                        className="w-full bg-gray-900 text-white py-4 rounded-xl font-medium shadow-lg hover:bg-gray-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group"
-                    >
-                        <MessageCircle size={20} className="group-hover:scale-110 transition-transform"/>
-                        Talk to Sakhi
-                    </button>
-                </div>
-            </div>
-        )}
+                      {/* Mood Tracker */}
+                      <div>
+                          <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                              <Heart size={18} className="text-sakhi-500" />
+                              {translation.moodTitle || "How are you feeling?"}
+                          </h3>
+                          <div className="flex justify-between gap-2 overflow-x-auto no-scrollbar pb-2">
+                              {[
+                                  { id: 'happy', icon: <Smile size={24} />, label: 'Happy', color: 'text-yellow-500 bg-yellow-50' },
+                                  { id: 'sad', icon: <Frown size={24} />, label: 'Low', color: 'text-blue-500 bg-blue-50' },
+                                  { id: 'irritated', icon: <Zap size={24} />, label: 'Angry', color: 'text-red-500 bg-red-50' },
+                                  { id: 'tired', icon: <Battery size={24} />, label: 'Tired', color: 'text-purple-500 bg-purple-50' },
+                                  { id: 'cramps', icon: <Coffee size={24} />, label: 'Pain', color: 'text-orange-500 bg-orange-50' },
+                              ].map((mood) => (
+                                  <button
+                                      key={mood.id}
+                                      onClick={() => handleMoodSelect(mood.id as Mood)}
+                                      className={`flex flex-col items-center gap-1 min-w-[60px] p-2 rounded-xl transition-all active:scale-95 ${
+                                          selectedMood === mood.id 
+                                          ? `ring-2 ring-sakhi-400 ${mood.color} shadow-sm` 
+                                          : 'hover:bg-gray-50 text-gray-400 grayscale hover:grayscale-0'
+                                      }`}
+                                  >
+                                      <div className={`p-2 rounded-full ${selectedMood === mood.id ? '' : 'bg-gray-100'}`}>
+                                          {mood.icon}
+                                      </div>
+                                      <span className="text-[10px] font-medium">{mood.label}</span>
+                                  </button>
+                              ))}
+                          </div>
+                          
+                          {/* Mood Result Card */}
+                          {selectedMood && moodData && (
+                              <div className="mt-4 bg-sakhi-50 border border-sakhi-100 p-4 rounded-xl animate-fade-in">
+                                   <p className="text-gray-800 font-medium text-sm mb-2">{moodData.message}</p>
+                                   <div className="flex gap-2 items-start text-sm text-gray-600 mt-2 bg-white/50 p-2 rounded-lg">
+                                       <span>{userProfile.dietPreference === 'vegetarian' ? '🥗' : '🍲'}</span>
+                                       <span>{userProfile.dietPreference === 'vegetarian' ? moodData.veg : moodData.nonVeg}</span>
+                                   </div>
+                                   {moodData.activity && (
+                                       <div className="flex gap-2 items-start text-sm text-gray-600 mt-2 bg-white/50 p-2 rounded-lg">
+                                           <span>🧘‍♀️</span>
+                                           <span>{moodData.activity}</span>
+                                       </div>
+                                   )}
+                              </div>
+                          )}
+                      </div>
 
-        {activeTab === 'chat' && (
-            <div key="chat" className="h-full animate-fade-in">
-                <ChatInterface 
-                    initialMessages={messages} 
-                    userProfile={userProfile} 
-                    initialInput={initialChatInput}
-                    onProfileUpdate={handleProfileUpdate}
-                    onBack={() => {
-                        refreshProfile();
-                        setInitialChatInput('');
-                        setActiveTab('home');
-                    }}
-                />
-            </div>
-        )}
-
-        {activeTab === 'profile' && (
-            <div key="profile" className="h-full animate-fade-in">
-                <ProfileSettings 
-                    userProfile={userProfile} 
-                    onSave={handleSaveProfile} 
-                />
-            </div>
-        )}
-      </div>
-
-      {/* Bottom Navigation - Show on Home and Profile screens */}
-      {activeTab !== 'chat' && (
-        <div className="bg-white/90 backdrop-blur-md border-t border-gray-100 px-6 py-3 pb-safe-bottom flex justify-between items-center absolute bottom-0 w-full z-20 safe-bottom">
-            <button 
-                onClick={() => { setActiveTab('home'); refreshProfile(); }}
-                className={`flex flex-col items-center gap-1 transition-all w-16 active:scale-95 ${activeTab === 'home' ? 'text-sakhi-500' : 'text-gray-400'}`}
-            >
-                <div className={`p-1 rounded-full ${activeTab === 'home' ? 'bg-sakhi-50' : 'bg-transparent'}`}>
-                    <Home size={24} strokeWidth={activeTab === 'home' ? 2.5 : 2} />
-                </div>
-                <span className="text-[10px] font-medium">Home</span>
-            </button>
-            
-            <button 
-                onClick={() => {
-                    setInitialChatInput('');
-                    setActiveTab('chat');
-                }}
-                className={`flex flex-col items-center gap-1 transition-all w-16 text-gray-400 active:scale-95 hover:text-sakhi-400`}
-            >
-                <div className="p-1 rounded-full">
-                    <MessageCircle size={24} strokeWidth={2} />
-                </div>
-                <span className="text-[10px] font-medium">Chat</span>
-            </button>
-
-            <button 
-                onClick={() => setActiveTab('profile')}
-                className={`flex flex-col items-center gap-1 transition-all w-16 active:scale-95 ${activeTab === 'profile' ? 'text-sakhi-500' : 'text-gray-400'}`}
-            >
-                <div className={`p-1 rounded-full ${activeTab === 'profile' ? 'bg-sakhi-50' : 'bg-transparent'}`}>
-                    <Settings size={24} strokeWidth={activeTab === 'profile' ? 2.5 : 2} />
-                </div>
-                <span className="text-[10px] font-medium">Profile</span>
-            </button>
-        </div>
+                      {/* Settings Access */}
+                      <div className="pt-4 border-t border-gray-100">
+                          <ProfileSettings userProfile={userProfile} onSave={handleSaveProfile} />
+                      </div>
+                  </div>
+              </div>
+          </div>
       )}
     </div>
   );

@@ -3,34 +3,36 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
-    <title>Sakhi - Your Health Companion</title>
+    <title>Sakhi - WhatsApp Bot Prototype</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
             colors: {
-              sakhi: {
-                50: '#fff1f2',
-                100: '#ffe4e6',
-                200: '#fecdd3',
-                300: '#fda4af',
-                400: '#fb7185',
-                500: '#f43f5e',
-                600: '#e11d48',
-                700: '#be123c',
-                800: '#9f1239',
-                900: '#881337',
+              wa: {
+                teal: '#008069', // Primary Header
+                dark: '#075E54', // Status Bar
+                light: '#25D366', // Accent Green
+                bg: '#EFE7DE',    // Chat Background
+                'chat-out': '#E7FFDB', // Outgoing Bubble
+                'chat-in': '#FFFFFF',  // Incoming Bubble
+              },
+              sakhi: { // Keeping legacy references mapped to WA colors for compatibility
+                50: '#E7FFDB',
+                100: '#dcf8c6',
+                400: '#25D366',
+                500: '#008069',
+                600: '#075E54',
               }
             },
             fontFamily: {
-              sans: ['Inter', 'system-ui', 'sans-serif'],
+              sans: ['Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif'],
             },
             animation: {
-              'fade-in': 'fadeIn 0.4s ease-out forwards',
-              'slide-up': 'slideUp 0.5s ease-out forwards',
+              'fade-in': 'fadeIn 0.3s ease-out forwards',
+              'slide-up': 'slideUp 0.3s ease-out forwards',
               'slide-in-right': 'slideInRight 0.3s ease-out forwards',
-              'pulse-slow': 'pulse 3s infinite',
             },
             keyframes: {
               fadeIn: {
@@ -52,12 +54,10 @@
     </script>
     <style>
       body {
-        background-color: #fce7f3; /* Light pink background outside app */
-        font-family: 'Inter', sans-serif;
-        /* Prevent bounce scroll on iOS */
+        background-color: #d1d7db; /* Desktop background */
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
         overscroll-behavior-y: none;
       }
-      /* Hide scrollbar for clean UI */
       .no-scrollbar::-webkit-scrollbar {
         display: none;
       }
@@ -65,7 +65,15 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
-      /* Safe area for iPhone X+ */
+      /* WhatsApp Doodle Background Pattern */
+      .wa-doodle-bg {
+        background-color: #EFE7DE;
+        background-image: url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png");
+        background-repeat: repeat;
+        background-size: 400px;
+        background-blend-mode: overlay;
+        opacity: 1;
+      }
       .safe-bottom {
         padding-bottom: env(safe-area-inset-bottom);
       }
@@ -84,11 +92,11 @@
   }
 }
 </script>
+<link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <div id="root"></div>
     <script>
-      // Global error handler to catch white screens on mobile
       function showError(msg) {
         const root = document.getElementById('root');
         if (root && root.innerHTML.trim() === '') {
@@ -102,14 +110,13 @@
       window.addEventListener('error', function(event) {
         if (event.message === 'ResizeObserver loop limit exceeded') return;
         showError(event.message);
-        console.error("Global error:", event.error);
       });
 
       window.addEventListener('unhandledrejection', function(event) {
         showError('Unhandled Promise Rejection: ' + event.reason);
-        console.error("Unhandled Rejection:", event.reason);
       });
     </script>
     <script type="module" src="./index.tsx"></script>
-  </body>
+  <script type="module" src="/index.tsx"></script>
+</body>
 </html>

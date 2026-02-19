@@ -1,7 +1,9 @@
+
 import React, { useState } from 'react';
 import { UserProfile, DietPreference, Language } from '../types';
 import { Save, User, Calendar, Utensils, Activity, Clock, Languages } from 'lucide-react';
 import { LANGUAGES } from '../constants';
+import CalendarInput from './CalendarInput';
 
 interface ProfileSettingsProps {
   userProfile: UserProfile;
@@ -14,6 +16,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ userProfile, onSave }
   const [diet, setDiet] = useState<DietPreference>(userProfile.dietPreference);
   const [language, setLanguage] = useState<Language>(userProfile.language || 'english');
   const [isSaved, setIsSaved] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
 
   const handleSave = () => {
     // Create updated profile object
@@ -58,14 +61,24 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ userProfile, onSave }
            
            <div className="space-y-4">
              <div>
-               <label className="block text-sm text-gray-600 mb-1">Last Period Start Date</label>
-               <input 
-                 type="date" 
-                 value={date}
-                 onChange={(e) => setDate(e.target.value)}
-                 className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sakhi-400 outline-none text-gray-800 transition-all"
-               />
-               <p className="text-xs text-gray-400 mt-1">Correct this if your start date was different.</p>
+               <label className="block text-sm text-gray-600 mb-2">Last Period Start Date</label>
+               {/* Toggle Calendar to save space in settings */}
+               <button 
+                  onClick={() => setShowCalendar(!showCalendar)}
+                  className="w-full text-left p-3 bg-gray-50 border border-gray-200 rounded-xl flex justify-between items-center hover:bg-gray-100 transition-colors mb-2"
+               >
+                  <span className={date ? 'text-gray-800' : 'text-gray-400'}>
+                    {date ? new Date(date).toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' }) : 'Select Date'}
+                  </span>
+                  <Calendar size={18} className="text-sakhi-500" />
+               </button>
+               
+               {showCalendar && (
+                  <div className="mb-2 animate-fade-in">
+                      <CalendarInput selectedDate={date} onDateSelect={(d) => { setDate(d); setShowCalendar(false); }} />
+                  </div>
+               )}
+               <p className="text-xs text-gray-400 mt-1">Tap to open calendar.</p>
              </div>
              
              <div>
